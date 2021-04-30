@@ -106,6 +106,10 @@ class _config(_base_config):
         'scale_width', 'scale_height', 'scale_both', None], doc="""
         Specify the default sizing mode behavior of panels.""")
 
+    template = param.ObjectSelector(
+        default=None, doc="""
+        The default template to render served applications into.""")
+
     throttled = param.Boolean(default=False, doc="""
         If sliders and inputs should be throttled until release of mouse.""")
 
@@ -471,6 +475,8 @@ class panel_extension(_pyviz_extension):
                 getattr(config, k).extend(v)
             elif k == 'js_files':
                 getattr(config, k).update(v)
+            elif k == 'template':
+                config.template = config.param.template.names[v]
             else:
                 setattr(config, k, v)
 
