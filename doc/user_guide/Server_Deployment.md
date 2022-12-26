@@ -123,7 +123,7 @@ Once you have deployed the app you might find that if your app is visited by mor
 
 #### Anaconda Enterprise 5 (AE5)
 
-All live examples in the Panel documentation are served on AE5, to see further examples deployed there see [examples.pyviz.org](https://examples.pyviz.org) and for detailed instructions follow the [developer guide](https://examples.pyviz.org/developer_guide.html).
+All live examples in the Panel documentation are served on AE5, to see further examples deployed there see [examples.pyviz.org](https://examples.pyviz.org) and for detailed instructions follow the [developer guide](https://examples.pyviz.org/make_project.html).
 
 #### Microsoft Azure
 
@@ -208,6 +208,59 @@ CMD panel serve app.py --address 0.0.0.0 --port 8080 --allow-websocket-origin="*
 Finally, to deploy a Panel app to App Engine run `gcloud app create` and `gcloud app deploy`. To deploy a Panel app to Cloud Run, run `gcloud run deploy`.
 
 For detailed information and steps, check out this [example](https://towardsdatascience.com/deploy-a-python-visualization-panel-app-to-google-cloud-cafe558fe787?sk=98a75bd79e98cba241cc6711e6fc5be5) on how to deploy a Panel app to App Engine and this [example](https://towardsdatascience.com/deploy-a-python-visualization-panel-app-to-google-cloud-ii-416e487b44eb?sk=aac35055957ba95641a6947bbb436410) on how to deploy a Panel app to Cloud Run.
+
+#### Hugging Face
+
+The guides below assumes you have already signed up and logged into your account at [huggingface.co](https://huggingface.co/).
+
+##### Duplicate an existing space
+
+The easiest way to get started is to  [search](https://huggingface.co/spaces), find and duplicate an existing space. A simple space to duplicate is
+[MarcSkovMadsen/awesome-panel](https://huggingface.co/spaces/MarcSkovMadsen/awesome-panel).
+
+- Open the space [MarcSkovMadsen/awesome-panel](https://huggingface.co/spaces/MarcSkovMadsen/awesome-panel).
+- Click the 3 dots and select *Duplicate this Space*.
+
+<img src="../_static/hugging-face-duplicate.png" style="width:67%"></img>
+
+- Follow the instructions to finish the duplication.
+
+Once you have finalized the duplication you will need to take a look at the `app.py` file in the new space to figure out what to replace.
+
+<img src="../_static/hugging-face-app-py.png" style="width:67%"></img>
+
+##### Creating a new space from scratch
+
+You can deploy Panel to Hugging Face Spaces as a [*Custom Python Space*](https://huggingface.co/docs/hub/spaces-sdks-python). For a general introduction to Hugging Face Spaces see the [Spaces Overview](https://huggingface.co/docs/hub/spaces-overview).
+
+Go to [Spaces](https://huggingface.co/spaces) and click the "Create New Space" button.
+
+<img src="../_static/hugging-face-create-new-space.png" style="width:67%"></img>
+
+Fill out the form. Make sure to select the *Gradio Space SDK*.
+
+<img src="../_static/hugging-face-create-spaces-form.png" style="width:67%"></img>
+
+A Gradio space will serve your app via the commmand `python app.py`. I.e. you cannot run `panel serve app.py ...`.
+
+To work around this your `app.py` will need to either
+
+- Use `subprocess` to run `panel serve ...` or
+- Use `pn.serve` to serve one or more functions.
+
+The app also needs to run on a port given by the `PORT` environment variable.
+
+Check out the example repository [MarcSkovMadsen/awesome-panel](https://huggingface.co/spaces/MarcSkovMadsen/awesome-panel/tree/main) for inspiration.
+
+##### Git clone
+
+Optionally you can git clone your repository using
+
+```bash
+git clone https://huggingface.co/spaces/NAME-OF-USER/NAME-OF-SPACE
+```
+
+<img src="../_static/hugging-face-git-clone.png" style="width:67%"></img>
 
 #### Other Cloud Providers
 

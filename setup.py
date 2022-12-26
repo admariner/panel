@@ -111,8 +111,8 @@ install_requires = [
     'tqdm >=4.48.0',
     'pyct >=0.4.4',
     'bleach',
-    'setuptools',
-    'typing_extensions'
+    'setuptools >=42',
+    'typing_extensions',
 ]
 
 _recommended = [
@@ -133,6 +133,7 @@ _tests = [
     'pytest-xdist',
     'pytest-cov',
     'pre-commit',
+    'psutil',
     # Libraries tested in unit tests
     'folium',
     'ipympl',
@@ -142,9 +143,13 @@ _tests = [
     'ipython >=7.0',
     'holoviews',
     'diskcache',
-    "markdown-it-py",
-    # Temporary pins (jupyter_bokeh needs updates)
-    'ipywidgets <8.0'
+    'markdown-it-py',
+    'ipyvuetify',
+    'reacton',
+    # Added lxml temporarily as installing pyechars or idom on Python 3.11
+    # via pip tries to build it and fails. To be removed.
+    'lxml',
+    'numpy <1.24', # Avoid VTK test fail
 ]
 
 _ui = [
@@ -184,7 +189,9 @@ extras_require = {
         'graphviz',
         'lxml',
         'python-graphviz',
-        'xgboost'
+        'xgboost',
+        'ipyvuetify',
+        'reacton'
     ],
     'tests': _tests,
     'recommended': _recommended,
@@ -208,12 +215,12 @@ extras_require['build'] = [
     'param >=1.9.2',
     'pyct >=0.4.4',
     'setuptools >=42',
-    'bokeh >=2.4.3',
-    'pyviz_comms >=0.6.0',
+    'bokeh >=2.4.3,<2.5.0',
+    'pyviz_comms >=0.7.4',
+    'requests',
+    'packaging',
     'bleach',
-    'tqdm',
-    'twine',
-    'rfc3986>=1.4.0'
+    'tqdm >=4.48.0',
 ]
 
 setup_args = dict(
@@ -255,6 +262,7 @@ setup_args = dict(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Operating System :: OS Independent",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",

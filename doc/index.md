@@ -40,7 +40,7 @@ width: 125
 :::
 
 :::{grid-item-card} Glaciers
-:link: https://penguins-crossfilter.pyviz.demo.anaconda.com
+:link: https://glaciers.pyviz.demo.anaconda.com
 :link-type: url
 
 ```{image} https://assets.holoviews.org/panel/thumbnails/index/glaciers.png
@@ -63,7 +63,6 @@ Panel is an [open-source](https://github.com/holoviz/panel/blob/master/LICENSE.t
 .. notebook:: panel ../examples/homepage.ipynb
     :disable_interactivity_warning: True
 ```
-
 
 Compared to other approaches, Panel is novel in that it supports nearly all plotting libraries, works just as well in a Jupyter notebook as on a standalone secure web server, uses the same code for both those cases, supports both Python-backed and static HTML/JavaScript exported applications, and can be used to develop rich interactive applications without tying your domain-specific code to any particular GUI or web tools.
 

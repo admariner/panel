@@ -2,11 +2,98 @@
 
 See [the HoloViz blog](https://blog.holoviz.org/tag/panel.html) for a visual summary of the major features added in each release.
 
+## Version 0.14.2
+
+Date: 2022-12-14
+
+This release primarily focuses on bug fixes. In particular it resolves various issues with support for rendering `ipywidgets` (particularly in `ipywidgets>=8.0`) and also fixes a number of issues with the Jupyter Server previews. Many thanks for @govinda18, @joelostblom, @banesullivan, @xeldnahcram, @geronimogoemon, @minasouliman, @peterfpeterson, @jlstevens and the core maintainers @maximlt, @Hoxbro, @MarcSkovMadsen and @philippjfr for their contributions to this release.
+
+### Enhancements
+
+- Add support for `Tqdm.process_map` ([#4093](https://github.com/holoviz/panel/pull/4093))
+- Support non-vtkPolyData types in vtk synchronizer ([#4124](https://github.com/holoviz/panel/pull/4124))
+- Allow invoking `convert` functions from pyodide ([#4135](https://github.com/holoviz/panel/pull/4135))
+- Support `step` format in date sliders ([#4152](https://github.com/holoviz/panel/pull/4152))
+- Add a `Reacton` component to simplify rendering ([#4190](https://github.com/holoviz/panel/pull/4190))
+
+### Bugs
+
+- Ensure Jupyter server extension serves resources, extensions and paths correctly ([#4083](https://github.com/holoviz/panel/pull/4083), [#4133](https://github.com/holoviz/panel/pull/4133), [#4202](https://github.com/holoviz/panel/pull/4202))
+- Ensure `IPyWidget` comm does not break when new widget is rendered ([#4091](https://github.com/holoviz/panel/pull/4091))
+- Improving detection of comms in VSCode and Google Colab ([#4115](https://github.com/holoviz/panel/pull/4115))
+- Ensure `.js` mimetype is served correctly on Windows ([#4118](https://github.com/holoviz/panel/pull/4118))
+- Ensure unhiding `Tabulator` columns renders cells correctly ([#4119](https://github.com/holoviz/panel/pull/4119))
+- Ensure embedded `Slider` widgets initialize with correct default ([#4121](https://github.com/holoviz/panel/pull/4121))
+- Handle missing event loop in thread gracefully ([#4123](https://github.com/holoviz/panel/pull/4123))
+- Ensure `Matplotlib` pane handles explicit `width`/`height` settings correctly ([#4128](https://github.com/holoviz/panel/pull/4128))
+- Allow `Viewer` to render servable but non-viewable objects ([#4131](https://github.com/holoviz/panel/pull/4131))
+- Fix regression in tracking sessions in admin interface ([#4132](https://github.com/holoviz/panel/pull/4132))
+- Ensure `Tabs` headers do not scroll unncessarily ([#4146](https://github.com/holoviz/panel/pull/4146))
+- Ensure `Location` model reports as idle ([#4159](https://github.com/holoviz/panel/pull/4159))
+- Fix auth error template rendering ([#4162](https://github.com/holoviz/panel/pull/4162))
+- Fix issues with value on `EditableSlider` when it is outside `fixed_start` / `fixed_end` range ([#4169](https://github.com/holoviz/panel/pull/4169))
+- Ensure `ipywidgets` events are handled the same way as regular events ([#4171](https://github.com/holoviz/panel/pull/4171))
+- Don't raise `TypeError` for class which contains `__panel__` ([#4174](https://github.com/holoviz/panel/pull/4174))
+- Do not dispatch events if bokeh `Document` is set to hold events ([#4178](https://github.com/holoviz/panel/pull/4178))
+- Execute `onload` callbacks immediately in pyodide app ([#4191](https://github.com/holoviz/panel/pull/4191))
+- Improve `IPyWidget` kernel handling in server contexts ([#4195](https://github.com/holoviz/panel/pull/4195))
+- Fix rendering of `IPyWidget` with child views in the notebook ([#4197](https://github.com/holoviz/panel/pull/4197))
+
+### Docs
+
+- Add JupyterLite build and instructions ([#4122](https://github.com/holoviz/panel/pull/4122))
+- Document deployment to Hugging Face Spaces ([#4143](https://github.com/holoviz/panel/pull/4143))
+
+## Version 0.14.1
+
+Date: 2022-10-28
+
+This release primarily addresses regressions introduced in 0.14.0 and various long standing bugs. Many thanks to external contributors @liu-kan and @KedoKudo and the maintainers @Hoxbro, @maximlt and @philippjfr for contributing a number of fixes.
+
+### Minor enhancements
+
+- Improve support for `requests` in pyodide ([#3973](https://github.com/holoviz/panel/pull/3973))
+- Add option to clear value of DatetimePicker ([#3990](https://github.com/holoviz/panel/pull/3990))
+- Add support for hashing dates in pn.cache ([#4004](https://github.com/holoviz/panel/pull/4004))
+- Silence `EMPTY_LAYOUT` warnings ([#4056](https://github.com/holoviz/panel/pull/4056))
+
+### Compatibility
+
+- Fix Jupyterlite and latest PyScript compatibility ([#4040](https://github.com/holoviz/panel/pull/4040))
+
+### Bugs
+
+#### Webassembly conversion
+
+- Correctly handle resource mode in when converting to WebAssembly ([#3967](https://github.com/holoviz/panel/pull/3967))
+
+### Jupyter and Server
+
+- Correctly handle future exceptions on threads ([#3977](https://github.com/holoviz/panel/pull/3977))
+- Fix `panel serve` index template ([#3980](https://github.com/holoviz/panel/pull/3980))
+- Do not error if `curdoc` has been destroyed ([#3994](https://github.com/holoviz/panel/pull/3994))
+- Ensure extensions loaded in jupyter kernel are served by StaticHandler ([#4000](https://github.com/holoviz/panel/pull/4000))
+- Various fixes for OAuth handling with `pn.serve` ([#4006](https://github.com/holoviz/panel/pull/4006))
+- Fix bug in `on_load` callback exception handling ([#4007](https://github.com/holoviz/panel/pull/4007))
+- Ensure periodic callbacks are only started on main thread ([#4011](https://github.com/holoviz/panel/pull/4011))
+- Ensure jupyter server extension handles explicit `root_dir` ([#4029](https://github.com/holoviz/panel/pull/4029))
+- Ensure futures are correctly awaited when executed on thread ([#4031](https://github.com/holoviz/panel/pull/4031))
+
+#### Components
+
+- Ensure `Tabulator` handles filtering on edited values correctly if `show_index=False` ([#3988](https://github.com/holoviz/panel/pull/3988), [#4016](https://github.com/holoviz/panel/pull/4016))
+- Ensure `Tabulator` declares numeric sorter for numeric dtypes ([#3999](https://github.com/holoviz/panel/pull/3999))
+- Fix regression initializing `DiscreteSlider` with non-integer value ([#4009](https://github.com/holoviz/panel/pull/4009))
+- Ensure that template.config.raw_css is correctly applied ([#4018](https://github.com/holoviz/panel/pull/4018))
+- Fix handling `MenuButton` clicks when `split=True` ([#4021](https://github.com/holoviz/panel/pull/4021))
+- Ensure styling on `Tabulator` with empty DataFrame does not error ([#4028](https://github.com/holoviz/panel/pull/4028))
+- Allow changing `level` on `Debugger` widget ([#4057](https://github.com/holoviz/panel/pull/4057))
+
 ## Version 0.14.0
 
-Date: 2022-09-30
-
 Blog post: [https://blog.holoviz.org/panel_0.14.html](https://blog.holoviz.org/panel_0.14.html)
+
+Date: 2022-09-30
 
 This release focuses on three main themes:
 

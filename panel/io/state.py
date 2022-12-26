@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from functools import partial, wraps
 from typing import (
     TYPE_CHECKING, Any, Callable, ClassVar, Coroutine, Dict,
-    Iterator as TIterator, List, Optional, Tuple, TypeVar, Union,
+    Iterator as TIterator, List, Optional, Tuple, Type, TypeVar, Union,
 )
 from urllib.parse import urljoin
 from weakref import WeakKeyDictionary
@@ -40,6 +40,8 @@ from .logging import LOG_SESSION_RENDERED, LOG_USER_MSG
 _state_logger = logging.getLogger('panel.state')
 
 if TYPE_CHECKING:
+    from concurrent.futures import Future
+
     from bokeh.model import Model
     from bokeh.server.contexts import BokehSessionContext
     from bokeh.server.server import Server
@@ -67,7 +69,10 @@ def set_curdoc(doc: Document):
         state._curdoc.reset(token)
 
 def curdoc_locked() -> Document:
-    doc = _curdoc()
+    try:
+        doc = _curdoc()
+    except RuntimeError:
+        return None
     if isinstance(doc, UnlockedDocumentProxy):
         doc = doc._doc
     return doc
@@ -81,8 +86,6 @@ class _state(param.Parameterized):
     Holds global state associated with running apps, allowing running
     apps to indicate their state to a user.
     """
-
-    admin_context = param.Parameter()
 
     base_url = param.String(default='/', readonly=True, doc="""
        Base URL for all server paths.""")
@@ -114,6 +117,9 @@ class _state(param.Parameterized):
     webdriver = param.Parameter(default=None, doc="""
       Selenium webdriver used to export bokeh models to pngs.""")
 
+    _busy_counter = param.Integer(default=0, doc="""
+       Count of active callbacks current being processed.""")
+
     _memoize_cache = param.Dict(default={}, doc="""
        A dictionary used by the cache decorator.""")
 
@@ -131,8 +137,10 @@ class _state(param.Parameterized):
     _admin_context = None
 
     # Jupyter communication
-    _comm_manager = _CommManager
+    _comm_manager: ClassVar[Type[_CommManager]] = _CommManager
+    _jupyter_kernel_context: ClassVar[bool] = False
     _kernels = {}
+    _ipykernels: ClassVar[WeakKeyDictionary[Document, Any]] = WeakKeyDictionary()
 
     # Locations
     _location: ClassVar[Location | None] = None # Global location, e.g. for notebook context
@@ -206,6 +214,12 @@ class _state(param.Parameterized):
             return IOLoop.current()
 
     @property
+    def _current_thread(self) -> str | None:
+        thread = threading.current_thread()
+        thread_id = thread.ident if thread else None
+        return thread_id
+
+    @property
     def _is_pyodide(self) -> bool:
         return '_pyodide' in sys.modules
 
@@ -219,9 +233,11 @@ class _state(param.Parameterized):
             self._thread_id_[self.curdoc] = thread_id
 
     def _unblocked(self, doc: Document) -> bool:
-        thread = threading.current_thread()
-        thread_id = thread.ident if thread else None
-        return doc is self.curdoc and self._thread_id in (thread_id, None)
+        return doc is self.curdoc and self._thread_id in (self._current_thread, None)
+
+    @param.depends('_busy_counter', watch=True)
+    def _update_busy_counter(self):
+        self.busy = self._busy_counter >= 1
 
     @param.depends('busy', watch=True)
     def _update_busy(self) -> None:
@@ -322,7 +338,7 @@ class _state(param.Parameterized):
     def _schedule_on_load(self, doc: Document, event) -> None:
         if self._thread_pool:
             future = self._thread_pool.submit(self._on_load, doc)
-            future.add_done_callback(self._handle_future_exception)
+            future.add_done_callback(partial(self._handle_future_exception, doc=doc))
         else:
             self._on_load(doc)
 
@@ -376,19 +392,22 @@ class _state(param.Parameterized):
                 self._handle_exception(e)
         return wrapper
 
-    def _handle_future_exception(self, future):
+    def _handle_future_exception(self, future: Future, doc: Document = None) -> None:
         exception = future.exception()
-        if exception:
+        if exception is None:
+            return
+
+        with set_curdoc(doc):
             self._handle_exception(exception)
 
-    def _handle_exception(self, exception):
+    def _handle_exception(self, exception) -> None:
         from ..config import config
-        thread = threading.current_thread()
-        thread_id = thread.ident if thread else None
-        if config.exception_handler and (self._thread_id is None or self._thread_id == thread_id):
+        if config.exception_handler:
             config.exception_handler(exception)
-        else:
+        elif isinstance(exception, BaseException):
             raise exception
+        else:
+            self.log(f'Exception of unknown type raised: {exception}', level='error')
 
     #----------------------------------------------------------------
     # Public Methods
@@ -478,12 +497,6 @@ class _state(param.Parameterized):
             callback=callback, period=period, count=count, timeout=timeout
         )
         if start:
-            if self._thread_id is not None:
-                thread = threading.current_thread()
-                thread_id = thread.ident if thread else None
-                if self._thread_id != thread_id:
-                    self.curdoc.add_next_tick_callback(cb.start)
-                    return cb
             cb.start()
         if self.curdoc:
             if self.curdoc not in self._periodic:
@@ -617,10 +630,10 @@ class _state(param.Parameterized):
         callback: Callable[[], None] | Coroutine[Any, Any, None]
            Callback that is executed when the application is loaded
         """
-        if self.curdoc is None:
+        if self.curdoc is None or self._is_pyodide:
             if self._thread_pool:
                 future = self._thread_pool.submit(partial(self.execute, callback, schedule=False))
-                future.add_done_callback(self._handle_exception)
+                future.add_done_callback(self._handle_future_exception)
             else:
                 self.execute(callback, schedule=False)
             return
@@ -808,18 +821,25 @@ class _state(param.Parameterized):
     # Public Properties
     #----------------------------------------------------------------
 
-    @property
-    def access_token(self) -> str | None:
+    def _decode_cookie(self, cookie_name):
         from tornado.web import decode_signed_value
 
         from ..config import config
-        access_token = self.cookies.get('access_token')
-        if access_token is None:
+        cookie = self.cookies.get(cookie_name)
+        if cookie is None:
             return None
-        access_token = decode_signed_value(config.cookie_secret, 'access_token', access_token)
+        cookie = decode_signed_value(config.cookie_secret, cookie_name, cookie)
         if self.encryption is None:
-            return access_token.decode('utf-8')
-        return self.encryption.decrypt(access_token).decode('utf-8')
+            return cookie.decode('utf-8')
+        return self.encryption.decrypt(cookie).decode('utf-8')
+
+    @property
+    def access_token(self) -> str | None:
+        return self._decode_cookie('access_token')
+
+    @property
+    def refresh_token(self) -> str | None:
+        return self._decode_cookie('refresh_token')
 
     @property
     def app_url(self) -> str | None:

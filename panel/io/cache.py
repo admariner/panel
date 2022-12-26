@@ -1,11 +1,13 @@
 """
 Implements memoization for functions with arbitrary arguments
 """
+import datetime as dt
 import functools
 import hashlib
 import inspect
 import io
 import os
+import pathlib
 import pickle
 import sys
 import threading
@@ -131,9 +133,11 @@ _hash_funcs = {
     type(None)   : lambda obj: b'0',
     (bytes, bytearray) : lambda obj: obj,
     (list, tuple, dict): _container_hash,
+    pathlib.Path       : lambda obj: str(obj).encode(),
     functools.partial  : _partial_hash,
     unittest.mock.Mock : lambda obj: _int_to_bytes(id(obj)),
     (io.StringIO, io.BytesIO): _io_hash,
+    dt.date      : lambda obj: f'{type(obj).__name__}{obj}'.encode('utf-8'),
     # Fully qualified type strings
     'numpy.ndarray'              : _numpy_hash,
     'pandas.core.series.Series'  : _pandas_hash,

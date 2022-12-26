@@ -1,5 +1,6 @@
 import asyncio
 import datetime as dt
+import logging
 import os
 import pathlib
 import time
@@ -14,7 +15,9 @@ from bokeh.events import ButtonClick
 from panel.config import config
 from panel.io import state
 from panel.io.resources import DIST_DIR
-from panel.io.server import get_server, serve, set_curdoc
+from panel.io.server import (
+    INDEX_HTML, get_server, serve, set_curdoc,
+)
 from panel.layout import Row
 from panel.models import HTML as BkHTML
 from panel.models.tabulator import TableEditEvent
@@ -27,17 +30,18 @@ from panel.widgets import (
 )
 
 
+@pytest.mark.xdist_group(name="server")
 def test_get_server(html_server_session):
-    html, server, session = html_server_session
+    html, server, session, port = html_server_session
 
-    assert server.port == 6000
+    assert server.port == port
     root = session.document.roots[0]
     assert isinstance(root, BkHTML)
     assert root.text == '&lt;h1&gt;Title&lt;/h1&gt;'
 
-
+@pytest.mark.xdist_group(name="server")
 def test_server_update(html_server_session):
-    html, server, session = html_server_session
+    html, server, session, port = html_server_session
 
     html.object = '<h1>New Title</h1>'
     session.pull()
@@ -45,9 +49,9 @@ def test_server_update(html_server_session):
     assert isinstance(root, BkHTML)
     assert root.text == '&lt;h1&gt;New Title&lt;/h1&gt;'
 
-
+@pytest.mark.xdist_group(name="server")
 def test_server_change_io_state(html_server_session):
-    html, server, session = html_server_session
+    html, server, session, port = html_server_session
 
     def handle_event(event):
         assert state.curdoc is session.document
@@ -68,6 +72,22 @@ def test_server_static_dirs(port):
     r = requests.get(f"http://localhost:{port}/tests/test_server.py")
     with open(__file__, encoding='utf-8') as f:
         assert f.read() == r.content.decode('utf-8').replace('\r\n', '\n')
+
+
+def test_server_root_handler(port):
+    html = Markdown('# Title')
+
+    serve(
+        {'app': html}, port=port, threaded=True, show=False, use_index=True,
+        index=INDEX_HTML, redirect_root=False
+    )
+
+    # Wait for server to start
+    time.sleep(1)
+
+    r = requests.get(f"http://localhost:{port}/")
+
+    assert 'href="./app"' in r.content.decode('utf-8')
 
 
 def test_server_template_static_resources(port):
@@ -433,21 +453,23 @@ def test_server_schedule_at_callable(port):
 
     server.stop()
 
-
+@pytest.mark.xdist_group(name="server")
 def test_show_server_info(html_server_session, markdown_server_session):
+    *_, html_port = html_server_session
+    *_, markdown_port = markdown_server_session
     server_info = repr(state)
-    assert "localhost:6000 - HTML" in server_info
-    assert "localhost:6001 - Markdown" in server_info
+    assert f"localhost:{html_port} - HTML" in server_info
+    assert f"localhost:{markdown_port} - Markdown" in server_info
 
-
+@pytest.mark.xdist_group(name="server")
 def test_kill_all_servers(html_server_session, markdown_server_session):
-    _, server_1, _ = html_server_session
-    _, server_2, _ = markdown_server_session
+    _, server_1, *_ = html_server_session
+    _, server_2, *_ = markdown_server_session
     state.kill_all_servers()
     assert server_1._stopped
     assert server_2._stopped
 
-
+@pytest.mark.xdist_group(name="server")
 def test_multiple_titles(multiple_apps_server_sessions):
     """Serve multiple apps with a title per app."""
     session1, session2 = multiple_apps_server_sessions(
@@ -568,7 +590,11 @@ def test_server_thread_pool_periodic(threads, port):
     time.sleep(1)
 
     # Checks whether periodic callbacks were executed concurrently
-    assert max(counts) >= 2
+    def _more_than_two():
+        if counts:
+            assert max(counts) >= 2
+
+    wait_until(_more_than_two)
 
 
 def test_server_thread_pool_onload(threads, port):
@@ -603,6 +629,36 @@ def test_server_thread_pool_onload(threads, port):
 
     # Checks whether onload callbacks were executed concurrently
     assert max(counts) >= 2
+
+
+def test_server_thread_pool_busy(threads, port):
+    button = Button(name='Click')
+
+    def cb(event):
+        time.sleep(0.5)
+
+    def simulate_click():
+        button._comm_event(state.curdoc, ButtonClick(model=None))
+
+    button.on_click(cb)
+
+    def app():
+        state.curdoc.add_next_tick_callback(simulate_click)
+        state.curdoc.add_next_tick_callback(simulate_click)
+        state.curdoc.add_next_tick_callback(simulate_click)
+        return button
+
+    serve(app, port=port, threaded=True, show=False)
+
+    # Wait for server to start
+    time.sleep(1)
+
+    requests.get(f"http://localhost:{port}/")
+
+    time.sleep(1)
+
+    assert state._busy_counter == 0
+    assert state.busy == False
 
 
 def test_server_async_onload(threads, port):
@@ -893,3 +949,30 @@ def test_server_exception_handler_async_onload_event(threads, handler, port, req
     time.sleep(0.5)
 
     assert len(exceptions) == 1
+
+
+def test_server_no_warning_empty_layout(port, caplog):
+
+    bk_logger = logging.getLogger('bokeh')
+    old_level = bk_logger.level
+    old_propagate = bk_logger.propagate
+    try:
+        # Test pretty dependent on how Bokeh sets up its logging system
+        bk_logger.propagate = True
+        bk_logger.setLevel(logging.WARNING)
+
+        app = Row()
+
+        serve(app, port=port, threaded=True, show=False)
+
+        # Wait for server to start
+        time.sleep(1)
+        requests.get(f"http://localhost:{port}")
+        time.sleep(1)
+
+        for rec in caplog.records:
+            if rec.levelname == 'WARNING':
+                assert 'EMPTY_LAYOUT' not in rec.message
+    finally:
+        bk_logger.setLevel(old_level)
+        bk_logger.propagate = old_propagate

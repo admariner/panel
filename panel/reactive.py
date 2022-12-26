@@ -309,9 +309,8 @@ class Syncable(Renderable):
 
     def _process_events(self, events: Dict[str, Any]) -> None:
         self._log('received events %s', events)
-        busy = state.busy
         with edit_readonly(state):
-            state.busy = True
+            state._busy_counter += 1
         events = self._process_property_change(events)
         try:
             with edit_readonly(self):
@@ -338,25 +337,24 @@ class Syncable(Renderable):
         finally:
             self._log('finished processing events %s', events)
             with edit_readonly(state):
-                state.busy = busy
+                state._busy_counter -= 1
 
     def _process_bokeh_event(self, doc: Document, event: Event) -> None:
         self._log('received bokeh event %s', event)
-        busy = state.busy
         with edit_readonly(state):
-            state.busy = True
+            state._busy_counter += 1
         try:
             with set_curdoc(doc):
                 self._process_event(event)
         finally:
             self._log('finished processing bokeh event %s', event)
             with edit_readonly(state):
-                state.busy = busy
+                state._busy_counter -= 1
 
     async def _change_coroutine(self, doc: Document) -> None:
         if state._thread_pool:
             future = state._thread_pool.submit(self._change_event, doc)
-            future.add_done_callback(state._handle_future_exception)
+            future.add_done_callback(partial(state._handle_future_exception, doc=doc))
         else:
             with set_curdoc(doc):
                 try:
@@ -367,7 +365,7 @@ class Syncable(Renderable):
     async def _event_coroutine(self, doc: Document, event) -> None:
         if state._thread_pool:
             future = state._thread_pool.submit(self._process_bokeh_event, doc, event)
-            future.add_done_callback(state._handle_future_exception)
+            future.add_done_callback(partial(state._handle_future_exception, doc=doc))
         else:
             try:
                 self._process_bokeh_event(doc, event)
@@ -397,7 +395,7 @@ class Syncable(Renderable):
         self._events.update({attr: new})
         if state._thread_pool:
             future = state._thread_pool.submit(self._schedule_change, doc, comm)
-            future.add_done_callback(state._handle_future_exception)
+            future.add_done_callback(partial(state._handle_future_exception, doc=doc))
         else:
             try:
                 self._schedule_change(doc, comm)
@@ -407,7 +405,7 @@ class Syncable(Renderable):
     def _comm_event(self, doc: Document, event: Event) -> None:
         if state._thread_pool:
             future = state._thread_pool.submit(self._process_bokeh_event, doc, event)
-            future.add_done_callback(state._handle_future_exception)
+            future.add_done_callback(partial(state._handle_future_exception, doc=doc))
         else:
             try:
                 self._process_bokeh_event(doc, event)
